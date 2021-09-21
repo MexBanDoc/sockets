@@ -159,40 +159,51 @@ namespace Sockets
 
         private static byte[] ProcessRequest(Request request)
         {
-            var file = request.RequestUri.Split('/').Last();
+            var uri = request.RequestUri;
+            var splitUri = uri.Split('?');
+            var host = splitUri.First();
+            var queryString = splitUri.Length == 1 ? string.Empty : splitUri.Last();
+            var param = HttpUtility.ParseQueryString(queryString);
             var head = new StringBuilder();
             var body = new byte[0];
-            if (file.Equals("") || file.Equals("hello.html"))
+            switch (host)
             {
-                body = File.ReadAllBytes("hello.html");
-                head.Append("HTTP/1.1 200 OK\r\n")
-                    .Append("Content-Type: text/html; charset=utf-8\r\n")
-                    .Append($"Content-Length: {body.Length}\r\n");
+                case "/":
+                case "/hello.html":
+                    body = File.ReadAllBytes("hello.html");
+                    var file = Encoding.UTF8.GetString(body);
+                    var name = param["name"];
+                    var greeting = param["greeting"];
+                    if (name is not null)
+                        file = file.Replace("{{WORLD}}", $"{name}");
+                    if (greeting is not null)
+                        file = file.Replace("{{HELLO}}", $"{greeting}");
+                    body = Encoding.UTF8.GetBytes(file);
+                    head.Append("HTTP/1.1 200 OK\r\n")
+                        .Append("Content-Type: text/html; charset=utf-8\r\n")
+                        .Append($"Content-Length: {body.Length}\r\n");
+                    break;
+                case "/groot.gif":
+                    body = File.ReadAllBytes("groot.gif");
+                    head.Append("HTTP/1.1 200 OK\r\n")
+                        .Append("Content-Type: image/gif; charset=utf-8\r\n")
+                        .Append($"Content-Length: {body.Length}\r\n");
+                    break;
+                case "/time.html":
+                    body = File.ReadAllBytes("time.template.html");
+                    file = Encoding.UTF8.GetString(body)
+                        .Replace("{{ServerTime}}",$"{DateTime.Now}");
+                    Console.WriteLine(file);
+                    body = Encoding.UTF8.GetBytes(file);
+                    head.Append("HTTP/1.1 200 OK\r\n")
+                        .Append("Content-Type: image/gif; charset=utf-8\r\n")
+                        .Append($"Content-Length: {body.Length}\r\n");
+                    break;
+                default:
+                    head = new StringBuilder("HTTP/1.1 404 Not Found\r\n");
+                    break;
             }
-
-            if (file.Equals("groot.gif"))
-            {
-                body = File.ReadAllBytes("groot.gif");
-                head.Append("HTTP/1.1 200 OK\r\n")
-                    .Append("Content-Type: image/gif; charset=utf-8\r\n")
-                    .Append($"Content-Length: {body.Length}\r\n");
-            }
-            if (file.Equals("time.html"))
-            {
-                body = File.ReadAllBytes("time.template.html");
-                var f = Encoding.UTF8.GetString(body)
-                    .Replace("{{ServerTime}}",$"{DateTime.Now}");
-                Console.WriteLine(f);
-                body = Encoding.UTF8.GetBytes(f);
-                head.Append("HTTP/1.1 200 OK\r\n")
-                    .Append("Content-Type: image/gif; charset=utf-8\r\n")
-                    .Append($"Content-Length: {body.Length}\r\n");
-            }
-            else
-            {
-                head = new StringBuilder("HTTP/1.1 404 Not Found\r\n");
-            }
-
+            
             head.Append("\r\n");
             
             return CreateResponseBytes(head, body);
