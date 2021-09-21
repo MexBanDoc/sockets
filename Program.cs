@@ -167,7 +167,26 @@ namespace Sockets
                 body = File.ReadAllBytes("hello.html");
                 head.Append("HTTP/1.1 200 OK\r\n")
                     .Append("Content-Type: text/html; charset=utf-8\r\n")
-                    .Append($"Content-Length: {file.Length}\r\n");
+                    .Append($"Content-Length: {body.Length}\r\n");
+            }
+
+            if (file.Equals("groot.gif"))
+            {
+                body = File.ReadAllBytes("groot.gif");
+                head.Append("HTTP/1.1 200 OK\r\n")
+                    .Append("Content-Type: image/gif; charset=utf-8\r\n")
+                    .Append($"Content-Length: {body.Length}\r\n");
+            }
+            if (file.Equals("time.html"))
+            {
+                body = File.ReadAllBytes("time.template.html");
+                var f = Encoding.UTF8.GetString(body)
+                    .Replace("{{ServerTime}}",$"{DateTime.Now}");
+                Console.WriteLine(f);
+                body = Encoding.UTF8.GetBytes(f);
+                head.Append("HTTP/1.1 200 OK\r\n")
+                    .Append("Content-Type: image/gif; charset=utf-8\r\n")
+                    .Append($"Content-Length: {body.Length}\r\n");
             }
             else
             {
