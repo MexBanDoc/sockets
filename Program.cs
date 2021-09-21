@@ -160,12 +160,16 @@ namespace Sockets
         private static byte[] ProcessRequest(Request request)
         {
             var uri = request.RequestUri;
+            var cookieHeader = request.Headers.FirstOrDefault(e => e.Name.Equals("Cookie"));
+            var cookieParam = cookieHeader?.Value.Split("; ")
+                    .Select(e => e.Split('='))
+                    .ToDictionary(e => e[0], e => e[1]);
             var splitUri = uri.Split('?');
             var host = splitUri.First();
             var queryString = splitUri.Length == 1 ? string.Empty : splitUri.Last();
             var param = HttpUtility.ParseQueryString(queryString);
             var head = new StringBuilder();
-            var body = new byte[0];
+            var body = Array.Empty<byte>();
             switch (host)
             {
                 case "/":
@@ -174,14 +178,29 @@ namespace Sockets
                     var file = Encoding.UTF8.GetString(body);
                     var name = param["name"];
                     var greeting = param["greeting"];
-                    if (name is not null)
-                        file = file.Replace("{{WORLD}}", $"{name}");
-                    if (greeting is not null)
-                        file = file.Replace("{{HELLO}}", $"{greeting}");
+                    if (name is null)
+                    {
+                        if (cookieParam != null && cookieParam.TryGetValue("name", out var value))
+                            file = file.Replace("{{World}}", $"{HttpUtility.HtmlEncode(HttpUtility.UrlDecode(value))}");
+                    }
+                    else
+                        file = file.Replace("{{World}}", $"{HttpUtility.HtmlEncode(name)}");
+
+                    if (greeting is null)
+                    {
+                        if (cookieParam != null && cookieParam.TryGetValue("greeting", out var value))
+                            file = file.Replace("{{Hello}}", $"{HttpUtility.HtmlEncode(HttpUtility.UrlDecode(value))}");
+                    }
+                    else
+                        file = file.Replace("{{Hello}}", $"{HttpUtility.HtmlEncode(greeting)}");
                     body = Encoding.UTF8.GetBytes(file);
                     head.Append("HTTP/1.1 200 OK\r\n")
                         .Append("Content-Type: text/html; charset=utf-8\r\n")
                         .Append($"Content-Length: {body.Length}\r\n");
+                    if (name is not null)
+                        head.Append($"Set-Cookie: name={HttpUtility.UrlEncode(name)}\r\n");
+                    if (greeting is not null)
+                        head.Append($"Set-Cookie: greeting={HttpUtility.UrlEncode(greeting)}\r\n");
                     break;
                 case "/groot.gif":
                     body = File.ReadAllBytes("groot.gif");
@@ -193,10 +212,9 @@ namespace Sockets
                     body = File.ReadAllBytes("time.template.html");
                     file = Encoding.UTF8.GetString(body)
                         .Replace("{{ServerTime}}",$"{DateTime.Now}");
-                    Console.WriteLine(file);
                     body = Encoding.UTF8.GetBytes(file);
                     head.Append("HTTP/1.1 200 OK\r\n")
-                        .Append("Content-Type: image/gif; charset=utf-8\r\n")
+                        .Append("Content-Type: text/html; charset=utf-8\r\n")
                         .Append($"Content-Length: {body.Length}\r\n");
                     break;
                 default:
